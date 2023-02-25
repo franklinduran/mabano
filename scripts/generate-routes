@@ -1,0 +1,19 @@
+#!/bin/bash
+
+input_file="./App/table_list"
+
+while read line
+do
+  echo "const { readAll, readOne, create, update, remove } = require('../controllers/${line}.controller.js');
+
+const router = require('express').Router();
+
+router.get('/', readAll);
+router.get('/:id', readOne);
+router.post('/', create);
+router.put('/:id', update);
+router.delete('/:id', remove);
+
+module.exports = router;
+" > ./backend/src/routes/$line.js
+done < $input_file

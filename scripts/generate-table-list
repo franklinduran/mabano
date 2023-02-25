@@ -1,0 +1,7 @@
+#!/bin/bash
+
+output_file="./App/table_list"
+
+tables=$(mysql -h $1 -u $3 -p$4 -e "USE $2; show tables from $2 like '%'" | grep -v 'Tables_in_' | grep -v 'view')
+
+echo $tables | tr ' ' '\n' > $output_file

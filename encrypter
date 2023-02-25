@@ -1,0 +1,88 @@
+#!/bin/bash
+
+name=$1
+
+if [ -z "$name" ]; then
+    echo "Específique el archivo a encryptar"
+    exit 1
+fi
+
+echo "Please enter a token to encrypt the script:"
+read -s token
+
+mkdir App ./App/scripts
+
+openssl aes-256-cbc -in $name -pass pass:"$token" | base64 > ./App/$name
+
+for file in ./scripts/*
+do
+    filename=$(basename "$file")
+    openssl aes-256-cbc -in "$file" -pass pass:"$token" | base64 > "./App/scripts/$filename"
+done
+
+printf '#!/bin/bash\necho "Please enter a token to run the script:"\nread -s token\n\n' > protected_$name
+printf 'user=""
+host=""
+db=""
+pass=""
+
+for i in "$@"
+do
+  case $i in
+    token=*)
+      token="${i#*=}"
+      if [[ -z "$token" ]]; then
+        echo "Error: El parámetro token no puede estar vacío"
+        exit 1
+      fi
+      ;;
+    user=*)
+      user="${i#*=}"
+      if [[ -z "$user" ]]; then
+        echo "Error: El parámetro user no puede estar vacío"
+        exit 1
+      fi
+      ;;
+    host=*)
+      host="${i#*=}"
+      if [[ -z "$host" ]]; then
+        echo "Error: El parámetro host no puede estar vacío"
+        exit 1
+      fi
+      ;;
+    db=*)
+      db="${i#*=}"
+      if [[ -z "$db" ]]; then
+        echo "Error: El parámetro db no puede estar vacío"
+        exit 1
+      fi
+      ;;
+    pass=*)
+      pass="${i#*=}"
+      if [[ -z "$pass" ]]; then
+        echo "Error: El parámetro pass no puede estar vacío"
+        exit 1
+      fi
+      ;;
+    *)
+      echo "Parámetro desconocido: $i"
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$user" || -z "$host" || -z "$db" || -z "$pass" ]]; then
+  echo "Error: Faltan parámetros. Por favor específica todos los parámetros."
+  exit 1
+fi\n\n' >> protected_$name
+
+printf 'printf $(cat "./App/'$name'") | base64 -d | openssl aes-256-cbc -d -pass pass:"$token" | bash -s $host $db $user $pass $token\n' >> protected_$name
+
+chmod +x protected_$name
+
+shc -f protected_$name -o launcher
+
+rm protected_$name
+rm protected_$name.x.c
+
+# -s host=localhost user=root db=scace pass=holamundo

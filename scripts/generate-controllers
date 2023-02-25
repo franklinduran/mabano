@@ -1,0 +1,99 @@
+#!/bin/bash
+
+MODELS_DIR="./backend/src/models"
+
+CONTROLLERS_DIR="./backend/src/controllers"
+
+for model_file in $MODELS_DIR/*.js; do
+
+  model_name=$(basename "$model_file" .js)
+
+  controller_name="$model_name.controller.js"
+
+  controller_path="$CONTROLLERS_DIR/$controller_name"
+
+  if [ -f "$controller_path" ]; then
+    echo "Controller file already exists: $controller_name"
+  else
+  
+    cat > "$controller_path" << EOF
+const $model_name = require('../models/$model_name'); // Replace $model_name with the actual name of your model
+
+exports.create = async (req, res) => {
+  try {
+    const createdModel = await $model_name.create(req.body);
+    res.status(201).json(createdModel);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+exports.readAll = async (req, res) => {
+  try {
+    const models = await $model_name.findAll();
+    res.status(200).json(models);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+exports.readOne = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const model = await $model_name.findOne({ where: { id } });
+    if (model) {
+      res.status(200).json(model);
+    } else {
+      res.status(404).json({ error: 'Model not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+exports.update = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [numRows, updatedModel] = await $model_name.update(req.body, {
+      where: { id },
+      returning: true,
+    });
+
+    if (numRows === 0) {
+      res.status(404).json({ error: 'Model not found' });
+    } else {
+      res.status(200).json(updatedModel[0]);
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+exports.remove = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const numRows = await $model_name.destroy({ where: { id } });
+    if (numRows === 0) {
+      res.status(404).json({ error: 'Model not found' });
+    } else {
+      res.status(204).end();
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+EOF
+
+    echo "Created controller file: $controller_name"
+  fi
+done
+
+

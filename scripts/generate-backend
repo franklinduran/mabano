@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Crear carpeta backend
+mkdir backend
+
+# Ir a la carpeta backend
+cd backend
+
+echo '{
+    "name": "backend",
+    "version": "1.0.0",
+    "description": "",
+    "main": "src/server.js",
+    "scripts": {
+        "setup": "npm install && npm update",
+        "start": "nodemon src/server.js"
+    },
+    "keywords": [
+        "express",
+        "backend"
+    ],
+    "license": "ISC"
+}' > package.json
+
+# Instalar dependencias
+pnpm i express mysql2 cookie-parser helmet mandatoryenv morgan sequelize cors express-custom-error has-keys http-status module-alias rotating-file-stream
+
+# Instalar dependencias de desarrollo
+pnpm i nodemon -D
+
+touch README.md
+
+touch .env
+
+echo "DB_HOST=$1
+DB_DATABASE=$2
+
+DB_USER=$3
+DB_PASSWORD=$4
+
+PORT=3000" > .env
+
+mkdir src
+
+cd src
+
+touch server.js
+
+mkdir controllers models routes util
+
+echo "require('mandatoryenv').load([
+    'DB_HOST',
+    'DB_DATABASE',
+    'DB_USER',
+    'DB_PASSWORD',
+    'PORT'
+]);
+const {
+    DB_HOST,
+    DB_DATABASE,
+    DB_USER,
+    DB_PASSWORD
+} = process.env;
+
+const Sequelize = require('sequelize');
+
+const db = new Sequelize(DB_DATABASE,  DB_USER, DB_PASSWORD,{
+    host: DB_HOST,
+    pool: {
+        max: 10,
+        min: 0,
+        acquire: 30000,
+        idle: 10000
+    },
+    dialect: 'mysql',
+    define: {
+        timestamps: false,
+        freezeTableName: true
+    }
+});
+
+module.exports = db;
+" > models/database.model.js
+
+echo "const morgan = require('morgan');
+const rfs = require('rotating-file-stream');
+const path = require('path');
+const fs = require('fs');
+
+// log directory path
+const logDirectory = path.resolve(__dirname, '../../log');
+
+// ensure log directory exists
+fs.existsSync(logDirectory) || fs.mkdirSync(logDirectory);
+
+// create a rotating write stream
+const accessLogStream = rfs.createStream('access.log', {
+    interval: '1d',
+    path: logDirectory
+})
+
+module.exports = {
+    dev: morgan('dev'),
+    combined: morgan('combined', { stream: accessLogStream })
+}" > util/logger.js
+
+cd ../../

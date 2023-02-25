@@ -1,0 +1,83 @@
+#!/bin/bash
+
+output_file="./backend/src/models"
+
+DB_HOST=$1
+DB_USER=$3
+DB_PASS=$4
+DB_NAME=$2
+
+TABLES=$(mysql -h $DB_HOST -u $DB_USER -p$DB_PASS $DB_NAME -e "SHOW TABLES" | tail -n +2 | grep -v 'view')
+
+for table in $TABLES; do
+  COLUMNS=$(mysql -h $DB_HOST -u $DB_USER -p$DB_PASS $DB_NAME -e "SHOW COLUMNS FROM $table" | tail -n +2)
+
+  echo "const { DataTypes, Model } = require('sequelize');
+const db = require('./database.model.js');" > $output_file/"$table.js"
+  echo "" >> $output_file/"$table.js"
+  echo "class $table extends Model {}" >> $output_file/"$table.js"
+  echo "$table.init({" >> $output_file/"$table.js"
+  
+  while read -r line; do
+    column=$(echo $line | awk '{print $1}')
+    type=$(echo $line | awk '{print $2}')
+    extra=$(echo $line | awk '{print $6}')
+    
+    case $type in
+      tinyint*|smallint*|mediumint*|bigint*|decimal*|float*|double*|real*)
+        datatype="DataTypes.$(echo $type | tr '[:lower:]' '[:upper:]')";;
+      int*)
+        datatype="DataTypes.STRING";;
+      date*|time*|year*|datetime*|timestamp*)
+        datatype="DataTypes.DATE";;
+      char*|varchar*|text*|tinytext*|mediumtext*|longtext*)
+        datatype="DataTypes.STRING";;
+      blob*|tinyblob*|mediumblob*|longblob*)
+        datatype="DataTypes.BLOB";;
+      enum*|set*)
+        values=$(echo $type | sed -e 's/^enum(//;s/)$//g')
+        datatype="DataTypes.ENUM($values)";;
+      *)
+        datatype="DataTypes.STRING";;
+    esac
+    
+    if [ "$extra" = "auto_increment" ]; then
+      echo "    $column: { 
+        type: $datatype, 
+        primaryKey: true, 
+        autoIncrement: true 
+    }," >> $output_file/"$table.js"
+    else
+      allow_null="true"
+      if [ "$line" == "${line/ NOT NULL /}" ]; then
+        allow_null="false"
+      fi
+      
+      unique="false"
+      if [ "$line" == "${line/ UNI /}" ]; then
+        unique="true"
+      fi
+
+      primary_key="true"
+      if [ "$column" == "id" ]; then
+        allow_null="false"
+      fi
+      
+      echo "    $column: { 
+        type: $datatype, 
+        primaryKey: $primary_key,
+        allowNull: $allow_null, 
+        unique: $unique 
+    }," >> $output_file/"$table.js"
+    fi
+  done <<< "$COLUMNS"
+
+  echo "}, {" >> $output_file/"$table.js"
+  echo "  sequelize: db," >> $output_file/"$table.js"
+  echo "  modelName: '$table'," >> $output_file/"$table.js"
+  echo "  timestamps: false" >> $output_file/"$table.js"
+  echo "});
+
+  module.exports = $table" >> $output_file/"$table.js"
+done
+
